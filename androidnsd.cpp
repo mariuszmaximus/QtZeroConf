@@ -230,7 +230,7 @@ void QZeroConfPrivate::onServiceResolved(const QString &name, const QString &typ
 	zcs->m_type = type;
 	// A previous implementation (based on avahi) returned service type as "_http._tcp" but Android API return "._http._tcp"
 	// Stripping leading dot for backwards compatibility. FIXME: Still not in line with bonjour, which adds a trailing dot.
-	zcs->m_type.remove(QRegExp("^."));
+	zcs->m_type.remove(0,1);// zcs->m_type.remove(QRegExp("^."));
 	zcs->m_host = hostname;
 	zcs->m_port = port;
 	zcs->m_ip = address;
