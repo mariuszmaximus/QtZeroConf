@@ -26,9 +26,9 @@
 **************************************************************************************************/
 #include "qzeroconf.h"
 
-#include <QtAndroid>
-#include <QtAndroidExtras>
-#include <QAndroidJniObject>
+#include <QMap>
+#include <QString>
+#include <QJniObject>
 
 class QZeroConfPrivate: QObject
 {
@@ -49,7 +49,7 @@ public:
 	static void onServiceNameChangedJNI(JNIEnv */*env*/, jobject /*thiz*/, jlong id, jstring newName);
 
 	QZeroConf *pub;
-	QAndroidJniObject nsdManager;
+	QJniObject nsdManager;
 
 	bool browserExists = false;
 	bool publisherExists = false;

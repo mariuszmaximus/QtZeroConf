@@ -24,7 +24,7 @@
    NsdManager wrapper for use on Android devices
 ---------------------------------------------------------------------------------------------------
 **************************************************************************************************/
-#include <QGuiApplication>
+#include <QGuiApplication>			// qGuiApp->applicationState()
 #include "androidnsd_p.h"
 
 Q_DECLARE_METATYPE(QHostAddress)
@@ -40,7 +40,7 @@ QZeroConfPrivate::QZeroConfPrivate(QZeroConf *parent)
 
 	pub = parent;
 
-	QAndroidJniEnvironment env;
+	QJniEnvironment env;
 
 	JNINativeMethod methods[] {
 		{ "onServiceResolvedJNI", "(JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/util/Map;)V", (void*)QZeroConfPrivate::onServiceResolvedJNI },
@@ -53,7 +53,7 @@ QZeroConfPrivate::QZeroConfPrivate(QZeroConf *parent)
 	// There seems to be no straight forward way to match the "thiz" pointer from JNI calls to our pointer of the Java class
 	// Passing "this" as ID down to Java so we can access "this" in callbacks.
 	// Note: needs to be quint64 as uintptr_t might be 32 or 64 bit depending on the system, while Java expects a jlong which is always 64 bit.
-	nsdManager = QAndroidJniObject("qtzeroconf/QZeroConfNsdManager", "(JLandroid/content/Context;)V", reinterpret_cast<quint64>(this), QtAndroid::androidActivity().object());
+	nsdManager = QJniObject("qtzeroconf/QZeroConfNsdManager", "(JLandroid/content/Context;)V", reinterpret_cast<quint64>(this), QtAndroid::androidActivity().object());
 	if (nsdManager.isValid()) {
 		jclass objectClass = env->GetObjectClass(nsdManager.object<jobject>());
 		env->RegisterNatives(objectClass, methods, sizeof(methods) / sizeof(methods[0]));
@@ -73,24 +73,24 @@ QZeroConfPrivate::~QZeroConfPrivate()
 // In order to not having to pay attention to only use thread safe methods on the java side, we're only running
 // Java calls on the Android thread.
 // To make sure the Java object is not going out of scope and being garbage collected when the QZeroConf object
-// is deleted before the worker thread actually starts, keep a new QAndroidJniObject to nsdManager
+// is deleted before the worker thread actually starts, keep a new QJniObject to nsdManager
 // which will increase the ref counter in the JVM.
 void QZeroConfPrivate::startServicePublish(const char *name, const char *type, quint16 port)
 {
-	QAndroidJniObject ref(nsdManager);
+	QJniObject ref(nsdManager);
 	publishName = name;
 	publishType = type;
-	QtAndroid::runOnAndroidThread([=](){
-		QAndroidJniObject txtMap("java/util/HashMap");
+	QNativeInterface::QAndroidApplication::runOnAndroidMainThread([=](){
+		QJniObject txtMap("java/util/HashMap");
 		foreach (const QByteArray &key, txtRecords.keys()) {
 			txtMap.callObjectMethod("put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
-									QAndroidJniObject::fromString(key).object<jstring>(),
-									QAndroidJniObject::fromString(txtRecords.value(key)).object<jstring>());
+									QJniObject::fromString(key).object<jstring>(),
+									QJniObject::fromString(txtRecords.value(key)).object<jstring>());
 		}
 
 		ref.callMethod<void>("registerService", "(Ljava/lang/String;Ljava/lang/String;ILjava/util/Map;)V",
-							 QAndroidJniObject::fromString(publishName).object<jstring>(),
-							 QAndroidJniObject::fromString(publishType).object<jstring>(),
+							 QJniObject::fromString(publishName).object<jstring>(),
+							 QJniObject::fromString(publishType).object<jstring>(),
 							 port,
 							 txtMap.object());
 	});
@@ -98,14 +98,14 @@ void QZeroConfPrivate::startServicePublish(const char *name, const char *type, q
 
 void QZeroConfPrivate::stopServicePublish()
 {
-	QAndroidJniObject ref(nsdManager);
+	QJniObject ref(nsdManager);
 	// If Android is on it's way to suspend when stopServicePublish() is called, we need to call nsd.unregisterService() synchronously
 	// to force it to run before the device goes to sleep.  If instead it is scheduled to run in the Android thread, it will not run
 	// until the device is woken back up.
 	if (qGuiApp->applicationState() == Qt::ApplicationSuspended) {
 		ref.callMethod<void>("unregisterService");
 	} else {
-		QtAndroid::runOnAndroidThread([ref]() {
+		QNativeInterface::QAndroidApplication::runOnAndroidMainThread([ref]() {
 			ref.callMethod<void>("unregisterService");
 		});
 	}
@@ -114,21 +114,21 @@ void QZeroConfPrivate::stopServicePublish()
 void QZeroConfPrivate::startBrowser(QString type, QAbstractSocket::NetworkLayerProtocol protocol)
 {
 	Q_UNUSED(protocol)
-	QAndroidJniObject ref(nsdManager);
-	QtAndroid::runOnAndroidThread([ref, type]() {
-		ref.callMethod<void>("discoverServices", "(Ljava/lang/String;)V", QAndroidJniObject::fromString(type).object<jstring>());
+	QJniObject ref(nsdManager);
+	QNativeInterface::QAndroidApplication::runOnAndroidMainThread([ref, type]() {
+		ref.callMethod<void>("discoverServices", "(Ljava/lang/String;)V", QJniObject::fromString(type).object<jstring>());
 	});
 }
 
 void QZeroConfPrivate::stopBrowser()
 {
-	QAndroidJniObject ref(nsdManager);
+	QJniObject ref(nsdManager);
 	// If Android is on it's way to suspend when stopBrowser() is called, we need to call nsd.stopServiceDiscovery() synchronously
 	// to force it to run before the device goes to sleep.
 	if (qGuiApp->applicationState() == Qt::ApplicationSuspended) {
 		ref.callMethod<void>("stopServiceDiscovery");
 	} else {
-		QtAndroid::runOnAndroidThread([ref]() {
+		QNativeInterface::QAndroidApplication::runOnAndroidMainThread([ref]() {
 			ref.callMethod<void>("stopServiceDiscovery");
 		});
 	}
@@ -140,13 +140,13 @@ void QZeroConfPrivate::stopBrowser()
 void QZeroConfPrivate::onServiceResolvedJNI(JNIEnv */*env*/, jobject /*thiz*/, jlong id, jstring name, jstring type, jstring hostname, jstring address, jint port, jobject txtRecords)
 {
 	QMap<QByteArray, QByteArray> txtMap;
-	QAndroidJniObject txt(txtRecords);
-	QAndroidJniObject txtKeys = txt.callObjectMethod("keySet", "()Ljava/util/Set;").callObjectMethod("toArray", "()[Ljava/lang/Object;");
+	QJniObject txt(txtRecords);
+	QJniObject txtKeys = txt.callObjectMethod("keySet", "()Ljava/util/Set;").callObjectMethod("toArray", "()[Ljava/lang/Object;");
 
-	QAndroidJniEnvironment env;
+	QJniEnvironment env;
 	for (int i = 0; i < txt.callMethod<jint>("size"); i++) {
-		QAndroidJniObject key = QAndroidJniObject(env->GetObjectArrayElement(txtKeys.object<jobjectArray>(), i));
-		QAndroidJniObject valueObj = txt.callObjectMethod("get", "(Ljava/lang/Object;)Ljava/lang/Object;", key.object<jstring>());
+		QJniObject key = QJniObject(env->GetObjectArrayElement(txtKeys.object<jobjectArray>(), i));
+		QJniObject valueObj = txt.callObjectMethod("get", "(Ljava/lang/Object;)Ljava/lang/Object;", key.object<jstring>());
 		if (valueObj.isValid()) {
 			jboolean isCopy;
 			jbyte* b = env->GetByteArrayElements(valueObj.object<jbyteArray>(), &isCopy);
@@ -164,10 +164,10 @@ void QZeroConfPrivate::onServiceResolvedJNI(JNIEnv */*env*/, jobject /*thiz*/, j
 		return;
 	}
 	QMetaObject::invokeMethod(ref, "onServiceResolved", Qt::QueuedConnection,
-							  Q_ARG(QString, QAndroidJniObject(name).toString()),
-							  Q_ARG(QString, QAndroidJniObject(type).toString()),
-							  Q_ARG(QString, QAndroidJniObject(hostname).toString()),
-							  Q_ARG(QHostAddress, QHostAddress(QAndroidJniObject(address).toString())),
+							  Q_ARG(QString, QJniObject(name).toString()),
+							  Q_ARG(QString, QJniObject(type).toString()),
+							  Q_ARG(QString, QJniObject(hostname).toString()),
+							  Q_ARG(QHostAddress, QHostAddress(QJniObject(address).toString())),
 							  Q_ARG(int, port),
 							  Q_ARG(TxtRecordMap, txtMap)
 							  );
@@ -181,7 +181,7 @@ void QZeroConfPrivate::onServiceRemovedJNI(JNIEnv */*env*/, jobject /*this*/, jl
 	if (!s_instances.contains(ref)) {
 		return;
 	}
-	QMetaObject::invokeMethod(ref, "onServiceRemoved", Qt::QueuedConnection, Q_ARG(QString, QAndroidJniObject(name).toString()));
+	QMetaObject::invokeMethod(ref, "onServiceRemoved", Qt::QueuedConnection, Q_ARG(QString, QJniObject(name).toString()));
 }
 
 
@@ -212,7 +212,7 @@ void QZeroConfPrivate::onServiceNameChangedJNI(JNIEnv */*env*/, jobject /*thiz*/
 	if (!s_instances.contains(ref)) {
 		return;
 	}
-	QMetaObject::invokeMethod(ref, "onServiceNameChanged", Qt::QueuedConnection, Q_ARG(QString, QAndroidJniObject(newName).toString()));
+	QMetaObject::invokeMethod(ref, "onServiceNameChanged", Qt::QueuedConnection, Q_ARG(QString, QJniObject(newName).toString()));
 }
 
 void QZeroConfPrivate::onServiceResolved(const QString &name, const QString &type, const QString &hostname, const QHostAddress &address, int port, const TxtRecordMap &txtRecords)
