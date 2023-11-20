@@ -85,6 +85,17 @@ endif()
 
 
 if(ANDROID)
+    target_sources(QtZeroConf PRIVATE
+    qzeroconf.h
+    androidnsd_p.h
+    androidnsd.cpp
+    )
+
+    find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Gui)
+    target_link_libraries(QtZeroConf PUBLIC Qt${QT_VERSION_MAJOR}::Gui)
+endif()
+
+if(ANDROID_OLD_AVAHI)
      set(ACM "${CMAKE_CURRENT_LIST_DIR}/avahi-common")
      set(ACR "${CMAKE_CURRENT_LIST_DIR}/avahi-core")
      target_sources(QtZeroConf PRIVATE
