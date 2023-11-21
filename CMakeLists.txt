@@ -182,6 +182,5 @@ install(EXPORT QtZeroConfConfig
 
 if(BUILD_EXAMPLE)
     add_subdirectory(example)
+    add_subdirectory(example/serviceDiscovery)
 endif()
-
-add_subdirectory(example/serviceDiscovery)
