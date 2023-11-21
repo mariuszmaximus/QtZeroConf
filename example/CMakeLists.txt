@@ -26,21 +26,21 @@ target_link_libraries(QtZeroConfExample
 )
 
 
-add_executable(serviceDiscovery
+add_executable(cmd_serviceDiscovery
     serviceDiscovery.cpp
 )
 
-target_link_libraries(serviceDiscovery
+target_link_libraries(cmd_serviceDiscovery
     QtZeroConf
     Qt${QT_VERISON_MAJOR}::Gui Qt${QT_VERSION_MAJOR}::Widgets
 )
 
 
-add_executable(servicePublish
+add_executable(cmd_servicePublish
     servicePublish.cpp
 )
 
-target_link_libraries(servicePublish
+target_link_libraries(cmd_servicePublish
     QtZeroConf
     Qt${QT_VERISON_MAJOR}::Gui Qt${QT_VERSION_MAJOR}::Widgets
 )
