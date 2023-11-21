@@ -91,6 +91,13 @@ if(ANDROID)
     androidnsd.cpp
     )
 
+    # temporary variable 
+    set(_QZEROCONF_JAVA_FILE "${CMAKE_SOURCE_DIR}/QZeroConfNsdManager.java" CACHE INTERNAL "")
+    # CMAKE_CURRENT_BINARY_DIR is take from call place       
+    function(QZEROCONF_COPY_JAVA_FILE) 
+        configure_file("${_QZEROCONF_JAVA_FILE}" "${CMAKE_CURRENT_BINARY_DIR}/android-build/build/generated/source/buildConfig/debug/qtzeroconf/QZeroConfNsdManager.java" COPYONLY)
+    endfunction()
+
     find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Gui)
     target_link_libraries(QtZeroConf PUBLIC Qt${QT_VERSION_MAJOR}::Gui)
 endif()
