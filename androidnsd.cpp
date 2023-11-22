@@ -86,7 +86,11 @@ void QZeroConfPrivate::startServicePublish(const char *name, const char *type, q
 	QJniObject ref(nsdManager);
 	publishName = name;
 	publishType = type;
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+	QtAndroid::runOnAndroidThread([=](){
+#else
 	QNativeInterface::QAndroidApplication::runOnAndroidMainThread([=](){
+#endif
 		QJniObject txtMap("java/util/HashMap");
 		foreach (const QByteArray &key, txtRecords.keys()) {
 			txtMap.callObjectMethod("put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
@@ -111,7 +115,11 @@ void QZeroConfPrivate::stopServicePublish()
 	if (qGuiApp->applicationState() == Qt::ApplicationSuspended) {
 		ref.callMethod<void>("unregisterService");
 	} else {
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+		QtAndroid::runOnAndroidThread([=](){
+#else
 		QNativeInterface::QAndroidApplication::runOnAndroidMainThread([ref]() {
+#endif
 			ref.callMethod<void>("unregisterService");
 		});
 	}
@@ -121,7 +129,11 @@ void QZeroConfPrivate::startBrowser(QString type, QAbstractSocket::NetworkLayerP
 {
 	Q_UNUSED(protocol)
 	QJniObject ref(nsdManager);
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+	QtAndroid::runOnAndroidThread([=](){
+#else
 	QNativeInterface::QAndroidApplication::runOnAndroidMainThread([ref, type]() {
+#endif
 		ref.callMethod<void>("discoverServices", "(Ljava/lang/String;)V", QJniObject::fromString(type).object<jstring>());
 	});
 }
@@ -134,7 +146,11 @@ void QZeroConfPrivate::stopBrowser()
 	if (qGuiApp->applicationState() == Qt::ApplicationSuspended) {
 		ref.callMethod<void>("stopServiceDiscovery");
 	} else {
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+		QtAndroid::runOnAndroidThread([=](){
+#else
 		QNativeInterface::QAndroidApplication::runOnAndroidMainThread([ref]() {
+#endif
 			ref.callMethod<void>("stopServiceDiscovery");
 		});
 	}
